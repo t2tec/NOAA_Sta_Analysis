@@ -1,0 +1,718 @@
+---
+title: "2016 Weather Data Exploratory Analysis - Part 2"
+author: ""
+date: ""
+output: 
+  html_document: 
+    fig_height: 8
+    fig_width: 12
+    keep_md: yes
+    theme: spacelab
+---
+
+![](C:/Users/tterry/Documents/NOAA Data/Logo/T2Logo.jpg)
+
+***
+***
+
+###NOAA Observation Station Analysis
+
+####Worldwide Density and Diversification
+
+***
+***
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+###Project Synopsis
+
+According to a report published on January 18, 2017 by the **National Aeronautics and Space Administration** (**NASA**) and the **National Oceanic and Atmospheric Administration** (**NOAA**):
+
+> ...(the) Earth's 2016 surface temperatures were the warmest since modern record keeping began in 1880.
+
+> Globally-averaged temperatures in 2016 were 1.78 degrees Fahrenheit (0.99 degrees Celsius) warmer than the mid-20th century mean. This makes 2016 the third year in a row to set a new record for global average surface temperatures.
+
+Source: https://www.nasa.gov/press-release/nasa-noaa-data-show-2016-warmest-year-on-record-globally
+
+***
+
+The **2016 Weather Data Exploratory Analysis** project was started to review the raw data from **NOAA** and identify areas of uncertainty and their potential impact on reaching a greater than 95% scientific certainty.
+
+This is **Part 2** of the **2016 Weather Data Exploratory Analysis**. 
+
+***
+
+This project is designed to analyze **NOAA** worldwide temperature observation stations in terms of:
+
++ Geographic diversity of stations
++ Geographic density of stations
+
+**Libraries Required**
+```{r, warning=FALSE, message=FALSE}
+library(dplyr)          # Data manipulation
+library(ggplot2)        # Graphics language for complex plots
+library(knitr)          # Dynamic report generation
+library(leaflet)        # Interactive mapping
+```
+
+```{r, echo=FALSE}
+setwd("~/NOAA Projects/NOAA Station Analysis")
+```
+  
+***
+
+###Stations Data
+
+The Stations Data to be used is the worldwide master list created in **Part 1** of **2016 Weather Data Exploratory Analysis**:
+
++ `master_stations_ww.rds`
+
+The second file to be used is a world land mass file created from **The World Bank**:
+
++ `world_land_mass.csv`
+
+
+Source: http://data.worldbank.org/indicator/AG.LND.TOTL.K2
+
+***
+
+####Read Station Files
+
+A brief view of the data will follow each processing step for clarification purposes.
+
+**Read Master Station Data**
+```{r, echo=FALSE}
+master_stations_ww <- readRDS("C:/Users/tterry/Documents/NOAA Data/Temp Stations/master_stations_ww.rds")
+```
+
+```{r, eval=FALSE}
+master_stations_ww <- readRDS("~/Temp Stations/master_stations_ww.rds")
+```
+
+```{r}
+kable(head(master_stations_ww, 5))
+```
+
+**Read World Land Mass File**
+```{r, echo=FALSE}
+world_land_mass <- read.csv("C:/Users/tterry/Documents/NOAA Data/Temp Stations/world_land_mass.csv", stringsAsFactors = FALSE)
+```
+
+```{r, eval=FALSE}
+world_land_mass <- read.csv("~/Temp Stations/world_land_mass.csv", stringsAsFactors = FALSE)
+```
+
+```{r}
+kable(head(world_land_mass, 5))
+```
+
+***
+
+###Data Exploration
+
+The data exploration will consist of the following:
+
++ Distribution of worldwide temperature stations in 2016
++ Density of worldwide temperature stations in 2016
+
+The first step will be to create a subset of the master list containing stations that are defined by **NOAA** as being active during 2016.
+
+**Create Station List for 2016**
+```{r}
+master_stations_2016 <- master_stations_ww %>%
+                        filter(FirstYear <= 2016,
+                               LastYear  >= 2016)
+
+kable(head(master_stations_2016, 5))
+```
+
+***
+
+####Distribution by Hemisphere
+
+The distribution analysis will begin with a review of the stations across the Northern and Southern Hemispheres. 
+
++ The Northern Hemisphere consists of stations with a latitude greater than 0 degrees
++ The Southern Hemisphere consists of stations with a latitude less than 0 degrees
+
+**Create Hemisphere Statistics**
+```{r}
+ww_ct <- nrow(master_stations_2016)
+
+nh_ct <- nrow(master_stations_2016 %>%
+              filter(Latitude > 0))
+
+sh_ct <- nrow(master_stations_2016 %>%
+              filter(Latitude < 0))
+
+nh_pt <- round(nh_ct/ww_ct * 100, 2)
+sh_pt <- round(sh_ct/ww_ct * 100, 2)
+```
+
+**Report Statistics by Hemisphere**
+```{r, echo=FALSE}
+cat(paste("    Worldwide Count:   ",      format(ww_ct, big.mark = ","),  "\n",
+                                                                          "\n",
+          "Northern Hemisphere:   ",      format(nh_ct, big.mark = ","), "   ",  nh_pt, "%",  "\n",
+          "Southern Hemisphere:   ", " ", format(sh_ct, big.mark = ","), "    ", sh_pt, "%",  sep = ""))
+```
+
+Land areas are distributed predominantly in the Northern Hemisphere (68%) relative to the Southern Hemisphere (32%) as divided by the equator. However, a significantly larger percentage of observation stations in 2016 were in the Northern Hemisphere. This fact can be important when reviewing the temperature observations later on and whether data is recorded consistently throughout the year. 
+
+***
+
+####Distribution by Quadrants
+
+The next analysis will look at distribution by geographic Quadrants.
+
+Earth Quadrants
+
++ Northwest Quadrant (positive Latitude, negative Longitude)
++ Southwest Quadrant (negative Latitude, negative Longitude)
++ Northeast Quadrant (positive Latitude, positive Longitude)
++ Southeast Quadrant (negative Latitude, positive Longitude)
+
+**Create Quadrant Statistics**
+```{r}
+nw_ct <- nrow(master_stations_2016 %>%
+              filter(Latitude  > 0,
+                     Longitude < 0))
+
+sw_ct <- nrow(master_stations_2016 %>%
+              filter(Latitude  < 0,
+                     Longitude < 0))
+
+ne_ct <- nrow(master_stations_2016 %>%
+              filter(Latitude  > 0,
+                     Longitude > 0))
+
+se_ct <- nrow(master_stations_2016 %>%
+              filter(Latitude  < 0,
+                     Longitude > 0))
+
+nw_pt <- round(nw_ct/ww_ct * 100, 2)
+sw_pt <- round(sw_ct/ww_ct * 100, 2)
+ne_pt <- round(ne_ct/ww_ct * 100, 2)
+se_pt <- round(se_ct/ww_ct * 100, 2)
+```
+
+**Report Statistics by Quadrant**
+```{r, echo=FALSE}
+cat(paste("         Worldwide Count:   ",         format(ww_ct, big.mark = ","),  "\n",
+                                                                                  "\n",
+          "Northwest Quadrant Count:   ",         format(nw_ct, big.mark = ","), "   ",   nw_pt,  "%",   "\n",
+          "Northeast Quadrant Count:   ", " ",    format(ne_ct, big.mark = ","), "   ",   ne_pt,  "%",   "\n",
+          "Southeast Quadrant Count:   ", "   ",  format(se_ct, big.mark = ","), "    ",  se_pt,  "%",  "\n",
+          "Southwest Quadrant Count:   ", "   ",  format(sw_ct, big.mark = ","), "    ",  sw_pt,  "%",   sep = ""))
+```
+
+The distribution of worldwide temperature observation stations is heavily skewed, not only to the Northern Hemisphere, but predominantly to the Northwest Quadrant. This issue will be further illustrated in the later visualizations.
+
+***
+
+####Distribution by Country
+
+Another examination of station distribution is to look at the number of stations per country.
+
+**Summarize by Country**
+```{r}
+master_country <- master_stations_2016 %>%
+                  group_by(Country) %>%
+                  summarise(Ctry_Cnt = n()) %>%
+                  arrange(desc(Ctry_Cnt))
+```
+
+```{r echo=FALSE}
+print(paste("Number of Countries in 2016 Master List:", nrow(master_country)))
+```
+
+There are a total of 193 Countries recognized by the United Nations, 2 countries that are not recognized, 61 dependent territories, and 6 disputed areas.
+
+Source: http://www.travelindependent.info/countries-howmany.htm
+
+**Review summarized data**
+```{r}
+kable(head(master_country,10))
+kable(tail(master_country,10))
+```
+
+The number of stations, by country, deployed around the world is also heavily skewed. Let's take a look at the distribution statistics. 
+
+**Summary of station density**
+```{r}
+quantile(master_country$Ctry_Cnt)
+quantile(master_country$Ctry_Cnt, prob = seq(0, 1, length = 11), type = 5)
+```
+
++ 50% of the countries have 6 or fewer observation stations
++ 80% of the countries have 20 or less observation stations
+
+***
+
+To get a better picture of the discrepancy between observation stations per country, we'll chart the top 20 countries in terms of observation station count.
+
+**Observation chart by country (top 20)**
+```{r}
+p <- ggplot(head(master_country, 20),
+            aes(x = reorder(factor(Country), Ctry_Cnt),
+                y = Ctry_Cnt,
+                fill = "burlywood4")) +
+                
+     labs(title="2016 - Observation Stations by Country (Top 20)", 
+          x = "",
+          y = "# Observation Stations") +
+     geom_bar(stat = "identity", width = 0.4) +
+     theme_bw() +
+     coord_flip() +
+     scale_fill_manual(values = c('burlywood4'), guide = FALSE) +
+     theme(axis.text = element_text(size = 8),
+           axis.text.y = element_text(size = 8))
+
+p
+```
+
+**Actual Counts per Country (Top 20)**
+```{r}
+kable(head(master_country, 20), caption = "master_country")
+```
+
+***
+
+####Distribution by Temperature Zones
+
+Since there is a very large discrepancy between the Hemispheres, Quadrants, and countries it makes sense to look at the distribution of stations across the temperature zones of the earth in order to determine if there is a balanced recording of observations across latitudes. It is generally recognized that there are three distinct temperature zones for each of the Northern and Southern Hemispheres:
+
++ Tropical Zone
++ Temperate Zone
++ Polar Zone
+
+**Create Temperature Zones Statistics**
+```{r}
+n_trop_ct <- nrow(master_stations_2016 %>%
+                  filter(Latitude  > 0,
+                         Latitude  < 30.0001))
+
+n_trop_pt <- round(n_trop_ct / ww_ct * 100, 2)
+
+n_temp_ct <- nrow(master_stations_2016 %>%
+                  filter(Latitude  > 30,
+                         Latitude  < 60.0001))
+
+n_temp_pt <- round(n_temp_ct / ww_ct * 100, 2)
+
+n_polr_ct <- nrow(master_stations_2016 %>%
+                  filter(Latitude  > 60,
+                         Latitude  < 90.0001))
+
+n_polr_pt <- round(n_polr_ct / ww_ct * 100, 2)
+
+s_trop_ct <- nrow(master_stations_2016 %>%
+                  filter(Latitude  < 0,
+                         Latitude  > -30.0001))
+
+s_trop_pt <- round(s_trop_ct / ww_ct * 100, 2)
+
+s_temp_ct <- nrow(master_stations_2016 %>%
+                  filter(Latitude  < -30,
+                         Latitude  > -60.0001))
+
+s_temp_pt <- round(s_temp_ct / ww_ct * 100, 2)
+
+s_polr_ct <- nrow(master_stations_2016 %>%
+                  filter(Latitude  < -60,
+                         Latitude  > -90.0001))
+
+s_polr_pt <- round(s_polr_ct / ww_ct * 100, 2)
+
+trop_cnt <- n_trop_ct + s_trop_ct
+trop_pct <- round(trop_cnt / ww_ct * 100, 2)
+
+temp_cnt <- n_temp_ct + s_temp_ct
+temp_pct <- round(temp_cnt / ww_ct * 100, 2)
+
+polr_cnt <- n_polr_ct + s_polr_ct
+polr_pct <- round(polr_cnt / ww_ct * 100, 2)
+```
+
+**Report Temperature Zones Statistics**
+```{r, echo=FALSE}
+cat(paste(" Northern Tropical Count:    ",    format(n_trop_ct, big.mark = ","), "    ", n_trop_pt, "%",  "\n",
+          "Northern Temperate Count:   ",     format(n_temp_ct, big.mark = ","), "   ",  n_temp_pt, "%",  "\n",
+          "    Northern Polar Count:      ",  format(n_polr_ct, big.mark = ","), "    ", n_polr_pt, "%",  "\n",
+                                                                                                         "\n",
+          " Southern Tropical Count:      ",  format(s_trop_ct, big.mark = ","), "    ", s_trop_pt, "%",  "\n",
+          "Southern Temperate Count:      ",  format(s_temp_ct, big.mark = ","), "    ", s_temp_pt, "%",  "\n",
+          "    Southern Polar Count:       ", format(s_polr_ct, big.mark = ","), "    ", s_polr_pt, "%",  "\n",
+                                                                                                         "\n",
+          "    Total Tropical Count:    ",    format(trop_cnt, big.mark = ","),  "   ",  trop_pct, "%",   "\n",
+          "   Total Temperate Count:   ",     format(temp_cnt, big.mark = ","),  "   ",  temp_pct, "%",   "\n",
+          "       Total Polar Count:    ",    format(polr_cnt, big.mark = ","),  "    ", polr_pct, "%",   sep = ""))
+```
+
+Once again, there is a vast discrepancy between temperature zones.
+
+We can see the dramatic difference through a map which charts all worldwide observation stations color coded by their temperature zone.
+
+**Create Temperature Zone Tables**
+```{r}
+trop_sta <- master_stations_2016 %>%
+            filter(Latitude  > -30.0001,
+                   Latitude  <  30.0001)
+
+temp_sta <- master_stations_2016 %>%
+            filter((Latitude  >  30 & Latitude  <  60.0001) |
+                   (Latitude  < -30 & Latitude  > -60.0001))
+
+polr_sta <- master_stations_2016 %>%
+            filter((Latitude  >  60 &  Latitude  <  90.0001) |
+                   (Latitude  < -60 &  Latitude  > -90.0001))
+```
+
+**Create Temperature Zone Map**
+```{r}
+TZ_Map <- leaflet() %>%
+         addTiles() %>% 
+         addProviderTiles("Stamen.TerrainBackground") %>%
+         setView(lng  = 0,
+                 lat  = 0,
+                 zoom = 2) %>% 
+         addCircleMarkers(data = trop_sta,
+                          lng = ~ Longitude,
+                          lat = ~ Latitude,
+                          radius = 2,
+                          color = "peru",
+                          stroke = FALSE,
+                          fillOpacity = .7) %>%
+         addCircleMarkers(data = temp_sta,
+                          lng = ~ Longitude,
+                          lat = ~ Latitude,
+                          radius = 2,
+                          color = "darkgreen",
+                          stroke = FALSE,
+                          fillOpacity = .5) %>%
+         addCircleMarkers(data = polr_sta,
+                          lng = ~ Longitude,
+                          lat = ~ Latitude,
+                          radius = 2,
+                          color = "steelblue",
+                          stroke = FALSE,
+                          fillOpacity = .8)
+```
+
+**Temperature Zone Map for Observation Stations - 2016**
+```{r, echo=FALSE}
+TZ_Map
+```
+
+The map illustrated the vast amount of surface area missing from the observation collection. This will be critical when exploring the methods that **NOAA** uses to aggregate and smooth data for their analysis and reporting.
+
+***
+
+####Distribution by Regions
+
+Included in `world_land_mass` is a region classification. This information will be joined to the master stations list to create summary totals and maps by sub-region to explore distributions at that level.
+
+```{r}
+master_regions <- left_join(master_stations_2016, world_land_mass, by = "Country")
+```
+
+**Summarize by Region**
+```{r}
+master_reg_sum <- master_regions %>%
+                  group_by(Region) %>%
+                  summarise(Reg_Cnt = n()) %>%
+                  arrange(desc(Reg_Cnt))
+```
+
+**Create Chart by Region**
+```{r}
+p <- ggplot(master_reg_sum,
+            aes(x = reorder(factor(Region), Reg_Cnt),
+                y = Reg_Cnt,
+                fill = "burlywood4")) +
+                
+     labs(title="2016 - Observation Stations by Region", 
+          x = "",
+          y = "# Observation Stations") +
+     geom_bar(stat = "identity", width = 0.4) +
+     theme_bw() +
+     coord_flip() +
+     scale_fill_manual(values = c('burlywood4'), guide = FALSE) +
+     scale_y_continuous(breaks = c(500, 1500, 2500, 3500, 4500, 5500, 6500, 7500, 8500, 9500),
+                        labels = c(  "500", "1,500", "2,500", "3,500", "4,500",
+                                   "5,500", "6,500", "7,500", "8,500", "9,500")) +
+     theme(axis.text = element_text(size = 8),
+           axis.text.y = element_text(size = 8))
+
+p
+```
+
+North America has over 9,500 observation stations while no other region has at least 1,000. In fact, all but four regions have counts below 500.
+
+***
+
+Regional maps will help illustrate the disparity in data gathering distribution.
+
+**Create Region Map Function**
+```{r}
+reg_map <- function(temp_reg, vw_zoom) {
+        
+        vw_long <- mean(temp_reg$Longitude)
+        vw_lat  <- mean(temp_reg$Latitude) 
+        
+        
+        RegMap <- leaflet() %>%
+                   addTiles() %>% 
+                   addProviderTiles("Stamen.TerrainBackground") %>%
+                   setView(lng  = vw_long,
+                           lat  = vw_lat,
+                           zoom = vw_zoom) %>% 
+                   addCircleMarkers(data = temp_reg,
+                                    lng = ~ Longitude,
+                                    lat = ~ Latitude,
+                                    radius = 3,
+                                    color = "red",
+                                    stroke = FALSE,
+                                    fillOpacity = .7) %>%
+                   addCircleMarkers(data = temp_reg,
+                                    lng = ~ Longitude,
+                                    lat = ~ Latitude,
+                                    radius = 1.5,
+                                    color = "black",
+                                    stroke = FALSE,
+                                    fillOpacity = .6)
+
+        return(RegMap)
+}
+```
+
+**North America Region Map**
+```{r, echo=FALSE}
+reg_map(master_regions %>%
+        filter(Region == "NORTHERN AMERICA"),
+        2)
+```
+
+**Central America and Caribbean Map**
+```{r, echo=FALSE}
+ca_car <- c("CENTRAL AMERICA", "CARIBBEAN")
+
+reg_map(master_regions %>%
+        filter(Region %in% ca_car),
+        4)
+```
+
+**South America Region Map**
+```{r, echo=FALSE}
+reg_map(master_regions %>%
+        filter(Region == "SOUTH AMERICA"),
+        3)
+```
+
+**European Region Map**
+```{r, echo=FALSE}
+eur_cts <- c("NORTHERN EUROPE", "EASTERN EUROPE", "SOUTHERN EUROPE", "WESTERN EUROPE")
+
+reg_map(master_regions %>%
+        filter(Region %in% eur_cts),
+        3)
+```
+
+**African Region Map**
+```{r, echo=FALSE}
+afr_cts <- c("NORTHERN AFRICA", "EASTERN AFRICA", "MIDDLE AFRICA", "SOUTHERN AFRICA", "WESTERN AFRICA")
+        
+reg_map(master_regions %>%
+        filter(Region %in% afr_cts),
+        3)
+```
+
+**Russia and Independent States Region Map**
+```{r, echo=FALSE}
+reg_map(master_regions %>%
+        filter(Region == "COMMONWEALTH OF INDEPENDENT STATES"),
+        2)
+```
+
+**Asian Region Map**
+```{r, echo=FALSE}
+asa_cts <- c("EASTERN ASIA", "SOUTH-EASTERN ASIA", "SOUTHERN ASIA", "WESTERN ASIA")
+reg_map(master_regions %>%
+        filter(Region %in% asa_cts),
+        3)
+```
+
+**Oceana Region Map**
+```{r, echo=FALSE}
+oce_cts <- c("POLYNESIA", "MICRONESIAN REGION", "MELANESIA", "AUSTRALIA AND NEW ZEALAND")
+
+reg_map(master_regions %>%
+        filter(Region %in% oce_cts),
+        3)
+```
+
+**Antarctic Region Map**
+```{r, echo=FALSE}
+reg_map(master_regions %>%
+        filter(Region == "ANTARCTICA"),
+        3)
+```
+
+It's clear from the maps and the statistics that sizeable segments of the planet are not being reported on by **NOAA**. In particular, Greenland has a land mass over 836,000 square miles but contains only 7 observation stations which all lie along it's coast. These locations are typically ice-free areas with small populations. This raises the issue of density of observation stations. That is, what is the average number of square miles per observation station in countries and regions around the world.
+
+***
+
+####Density by Land Mass
+
+The `world_land_mass.csv` contains the square miles of land mass for each country in the world. The `master_country` data will be joined with the `world_land_mass` data to provide information on land mass by country and the number of square miles per observation station.
+
+The summarization will have total country area in thousands of square miles and square miles per station in hundreds of miles in order to make the resulting chart more readable. The variable `Sq_Mile_Sta` is set to a negative number strictly for creating a dual axis chart.
+
+**Summarize by Region for Land Mass**
+```{r}
+master_cty_lm  <- left_join(master_country, world_land_mass, by = "Country") %>%
+                  mutate(Sq_Mile_Sta = round(Area / Ctry_Cnt, 0)) %>%
+                  arrange(desc(Area)) %>%
+                  transform(Sq_Mile_Sta = Sq_Mile_Sta / 100 * -1,
+                            Area = Area / 1000)
+```
+
+**Create Chart by Land Mass**
+```{r}
+p <- ggplot(head(master_cty_lm, 30),
+            aes(x = reorder(factor(Country), Area),
+                y = Area,
+                fill = "burlywood4")) +
+                
+     labs(title="2016 - Observation Stations by Land Mass (Top 30)", 
+          x = "",
+          y = "") +
+     geom_linerange(head(master_cty_lm, 30),
+                    mapping=aes(x = reorder(factor(Country), Area),
+                                ymin = 0,
+                                ymax = Area),
+                    colour = "darkolivegreen4", alpha=.8, size=3) +
+     geom_linerange(head(master_cty_lm, 30),
+                    mapping=aes(x = reorder(factor(Country), Area),
+                                ymin = 0,
+                                ymax = Sq_Mile_Sta),
+                    colour = "steelblue", alpha=.8, size=3) +
+     scale_y_continuous(breaks = c(-2500, -1250, 0,
+                                   1250, 2500, 3750, 5000, 6250),
+                        labels = c("2,500 Sq Miles", "1,250 Sq Miles",
+                                   "0",
+                                   "1,250 Sq Miles", "2,500 Sq Miles",
+                                   "3,750 Sq Miles", "5,000 Sq Miles",
+                                   "6,250 Sq Miles")) +
+     theme_bw() +
+     coord_flip() +
+     theme(axis.text = element_text(size = 8),
+           axis.text.y = element_text(size = 8)) +
+     geom_hline(yintercept = 0, colour = "grey40", linetype=1) +
+     annotate("text",
+              x = 1.2,
+              y = -2500,
+              label = "Square Miles per Station (in 100s)",
+              size=2.5,
+              colour="steelblue",
+              fontface="bold",
+              hjust=0) +
+     annotate("text",
+              x = 1.2,
+              y = 6250,
+              label = "Square Miles of Land Mass (in 1000s)",
+              size=2.5,
+              colour="darkolivegreen4",
+              fontface="bold",
+              hjust=1)
+     
+p
+```
+
+The United States, Canada, Australia, and Russia all indicate a very high level of density regarding observation stations, especially given their large land mass. However, if you refer back to the distribution maps previously created, only the United States would be considered fully covered. All of the other top land mass countries display very large sections with very few stations. This means that density within the countries is extremely high in certain areas or cities and very sparse in outlying areas.
+
+A similar visualization can be created for the number of square miles per observation station to identify the least densely covered countries.
+
+**Create Chart by Square Miles per Station**
+```{r}
+master_cty_lm <- master_cty_lm %>%
+                 arrange(Sq_Mile_Sta)
+
+p <- ggplot(head(master_cty_lm, 30),
+            aes(x = reorder(factor(Country), desc(Sq_Mile_Sta)),
+                y = Sq_Mile_Sta,
+                fill = "burlywood4")) +
+                
+     labs(title="2016 - Square Miles per Observation Station (Top 30)", 
+          x = "",
+          y = "") +
+     geom_linerange(head(master_cty_lm, 30),
+                    mapping=aes(x = reorder(factor(Country), desc(Sq_Mile_Sta)),
+                                ymin = 0,
+                                ymax = Area),
+                    colour = "darkolivegreen4", alpha=.8, size=3) +
+     geom_linerange(head(master_cty_lm, 30),
+                    mapping=aes(x = reorder(factor(Country), desc(Sq_Mile_Sta)),
+                                ymin = 0,
+                                ymax = Sq_Mile_Sta),
+                    colour = "steelblue", alpha=.8, size=3) +
+     scale_y_continuous(breaks = c(-2500, -1250, 0,
+                                   1250, 2500, 3750, 5000, 6250),
+                        labels = c("2,500 Sq Miles", "1,250 Sq Miles",
+                                   "0",
+                                   "1,250 Sq Miles", "2,500 Sq Miles",
+                                   "3,750 Sq Miles", "5,000 Sq Miles",
+                                   "6,250 Sq Miles")) +
+     theme_bw() +
+     coord_flip() +
+     theme(axis.text = element_text(size = 8),
+           axis.text.y = element_text(size = 8)) +
+     geom_hline(yintercept = 0, colour = "grey40", linetype=1) +
+     annotate("text",
+              x = 1.2,
+              y = -2500,
+              label = "Square Miles per Station (in 100s)",
+              size=2.5,
+              colour="steelblue",
+              fontface="bold",
+              hjust=0) +
+     annotate("text",
+              x = 1.2,
+              y = 6250,
+              label = "Square Miles of Land Mass (in 1000s)",
+              size=2.5,
+              colour="darkolivegreen4",
+              fontface="bold",
+              hjust=1)
+     
+p
+```
+
+For the countries identified in the visualization, their respective average temperatures will consist of fewer total observations and ignore potential temperature observations due to a lack of stations. For areas like Greenland and Antarctica, subject of many climate related theories, the actual observation capabilities are limited to a relatively small number of coastal stations.
+
+***
+
+### Next Steps
+
+Using the master observation lists created in the previous project, a data exploration and analysis was performed to review station densities and distributions around the world. 
+
+The focus was on Hemispheric, Quadrant, region and country diversity along with land mass comparisons for density. It was found that the vast majority of world is underreported by current temperature observation stations, especially when compared to the United States, and large segments of the planet are completely barren and absent from the temperature record. 
+
+In **Part 3**, the focus will be on the stations present during the Mid-Century baseline years (1951-1980) compared to 2016. 
+
+In **Part 4**, a review of the methodology that **NOAA** uses to aggregate data across geographic sectors will be performed. 
+
+***
+***
+
+![](C:/Users/tterry/Documents/NOAA Data/Logo/T2Logo.jpg)
+
+***
+
+```{r}
+sessionInfo()
+```
+
+
+
